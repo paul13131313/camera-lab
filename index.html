@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>写ルン Lab. — 使い捨てカメラ風フィルター</title>
+<meta name="description" content="使い捨てカメラ風フィルターで写真を現像するWebアプリ。彩度・コントラスト・粒子・周辺光量を自由に調整。">
+<meta property="og:title" content="写ルン Lab. — 使い捨てカメラ風フィルター">
+<meta property="og:description" content="使い捨てカメラ風フィルターで写真を現像するWebアプリ">
+<meta property="og:image" content="https://og-api-self.vercel.app/api/og?title=%E5%86%99%E3%83%AB%E3%83%B3%20LAB.&category=Tools%20%26%20Utility">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1A120A">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Courier+Prime:wght@400;700&family=Noto+Serif+JP:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F2EBD9;
+    --paper-dark: #E5D9C0;
+    --ink: #1A120A;
+    --sepia: #8B6240;
+    --gold: #C9973A;
+    --red: #C0392B;
+    --film-hole: #1A120A;
+    --shadow: rgba(26,18,10,0.18);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--ink);
+    background-image: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255,255,255,0.015) 2px,
+      rgba(255,255,255,0.015) 4px
+    );
+    min-height: 100vh;
+    font-family: 'Courier Prime', monospace;
+    color: var(--ink);
+  }
+
+  /* ── フィルムストリップ ヘッダー ── */
+  .film-strip {
+    background: var(--ink);
+    padding: 12px 0 8px;
+    overflow: hidden;
+    position: relative;
+  }
+  .film-holes {
+    display: flex;
+    gap: 18px;
+    padding: 0 12px;
+    justify-content: flex-start;
+  }
+  .hole {
+    width: 14px;
+    height: 10px;
+    border-radius: 2px;
+    background: #333;
+    border: 1.5px solid #444;
+    flex-shrink: 0;
+  }
+
+  header {
+    background: var(--paper-dark);
+    border-top: 3px solid var(--gold);
+    border-bottom: 3px solid var(--gold);
+    padding: 20px 40px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    right: -20px; top: -20px;
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    background: rgba(201,151,58,0.08);
+  }
+  .brand {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3.2rem;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    line-height: 1;
+  }
+  .brand span {
+    color: var(--red);
+  }
+  .tagline {
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.7rem;
+    color: var(--sepia);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    border-left: 2px solid var(--sepia);
+    padding-left: 12px;
+    line-height: 1.4;
+  }
+
+  /* ── メインレイアウト ── */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    align-items: start;
+  }
+
+  .panel {
+    background: var(--paper);
+    border: 1.5px solid rgba(139,98,64,0.3);
+    border-radius: 2px;
+    overflow: hidden;
+    box-shadow: 4px 4px 0 rgba(0,0,0,0.4), 8px 8px 0 rgba(0,0,0,0.15);
+  }
+
+  .panel-label {
+    background: var(--ink);
+    color: var(--paper);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 0.85rem;
+    letter-spacing: 0.25em;
+    padding: 6px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-label .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+  }
+
+  /* ── アップロードエリア ── */
+  .upload-area {
+    position: relative;
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: var(--paper);
+    transition: background 0.2s;
+    border: none;
+  }
+  .upload-area.drag-over {
+    background: #EDE3CB;
+  }
+  .upload-area input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+  .upload-icon {
+    font-size: 3rem;
+    margin-bottom: 12px;
+    opacity: 0.5;
+    line-height: 1;
+  }
+  .upload-text {
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.85rem;
+    color: var(--sepia);
+    text-align: center;
+    letter-spacing: 0.08em;
+    line-height: 1.6;
+  }
+  .upload-text strong {
+    display: block;
+    font-size: 1.05rem;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+
+  /* ── オリジナル画像プレビュー ── */
+  #original-preview {
+    width: 100%;
+    display: none;
+    object-fit: contain;
+    max-height: 360px;
+  }
+
+  /* ── スライダーコントロール ── */
+  .controls {
+    padding: 20px;
+  }
+  .control-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .control-row:last-child { margin-bottom: 0; }
+  .ctrl-label {
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--sepia);
+    width: 80px;
+    flex-shrink: 0;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    flex: 1;
+    height: 3px;
+    background: linear-gradient(to right, var(--gold) var(--pct, 50%), #D4C9B0 var(--pct, 50%));
+    border-radius: 0;
+    cursor: pointer;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    background: var(--ink);
+    border: 2px solid var(--gold);
+    border-radius: 0;
+    cursor: pointer;
+  }
+  .ctrl-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1rem;
+    color: var(--ink);
+    width: 30px;
+    text-align: right;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── プリセットボタン ── */
+  .presets {
+    padding: 0 20px 16px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .preset-btn {
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    background: transparent;
+    border: 1.5px solid var(--sepia);
+    color: var(--sepia);
+    cursor: pointer;
+    transition: all 0.15s;
+    border-radius: 0;
+  }
+  .preset-btn:hover, .preset-btn.active {
+    background: var(--ink);
+    color: var(--gold);
+    border-color: var(--ink);
+  }
+
+  .divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--sepia), transparent);
+    opacity: 0.3;
+    margin: 0 20px 16px;
+  }
+
+  /* ── キャンバス出力 ── */
+  .canvas-wrap {
+    position: relative;
+    background: #111;
+    min-height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #output-canvas {
+    max-width: 100%;
+    max-height: 400px;
+    display: block;
+  }
+  .canvas-placeholder {
+    color: #444;
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+    text-align: center;
+    line-height: 2;
+  }
+  .canvas-placeholder .big {
+    font-size: 2.5rem;
+    display: block;
+    opacity: 0.3;
+  }
+
+  /* ── ダウンロードボタン ── */
+  .dl-area {
+    padding: 16px 20px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  #dl-btn {
+    flex: 1;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.05rem;
+    letter-spacing: 0.2em;
+    padding: 10px 20px;
+    background: var(--ink);
+    color: var(--gold);
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    border-radius: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    opacity: 0.4;
+    pointer-events: none;
+  }
+  #dl-btn.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+  #dl-btn:hover {
+    background: var(--gold);
+    color: var(--ink);
+  }
+  #dl-btn svg { flex-shrink: 0; }
+
+  /* ── フォトカウンター ── */
+  .photo-counter {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    color: var(--sepia);
+    opacity: 0.5;
+    line-height: 1;
+    text-align: right;
+    letter-spacing: 0.05em;
+  }
+  .photo-counter small {
+    display: block;
+    font-size: 0.55rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-family: 'Courier Prime', monospace;
+  }
+
+  /* ── フィルムストリップ フッター ── */
+  footer {
+    background: var(--ink);
+    text-align: center;
+    padding: 14px;
+    font-family: 'Courier Prime', monospace;
+    font-size: 0.65rem;
+    color: #555;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  /* ── レスポンシブ ── */
+  @media (max-width: 720px) {
+    .container { grid-template-columns: 1fr; }
+    .brand { font-size: 2.2rem; }
+    header { padding: 14px 20px; }
+  }
+
+  /* ── 処理中インジケーター ── */
+  .processing {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gold);
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 0.3em;
+    font-size: 0.9rem;
+    z-index: 10;
+    display: none;
+  }
+  .processing.show { display: flex; }
+</style>
+</head>
+<body>
+
+<!-- Film strip top -->
+<div class="film-strip">
+  <div class="film-holes" id="holes-top"></div>
+</div>
+
+<header>
+  <div class="brand">写ルン<span>Lab.</span></div>
+  <div class="tagline">使い捨てカメラ<br>フィルターサービス</div>
+</header>
+
+<!-- Film strip below header -->
+<div class="film-strip">
+  <div class="film-holes" id="holes-mid"></div>
+</div>
+
+<div class="container">
+
+  <!-- 左パネル：アップロード＆コントロール -->
+  <div>
+    <div class="panel" style="margin-bottom: 20px;">
+      <div class="panel-label"><span class="dot"></span> LOAD FILM</div>
+      <div class="upload-area" id="upload-area">
+        <input type="file" id="file-input" accept="image/*">
+        <div class="upload-icon">📷</div>
+        <div class="upload-text">
+          <strong>写真をドロップ / クリックして選択</strong>
+          JPG · PNG · WEBP
+        </div>
+      </div>
+      <img id="original-preview" alt="original">
+    </div>
+
+    <div class="panel">
+      <div class="panel-label"><span class="dot"></span> FILTER CONTROL</div>
+
+      <!-- プリセット -->
+      <div class="presets">
+        <button class="preset-btn active" onclick="applyPreset('standard')">標準</button>
+        <button class="preset-btn" onclick="applyPreset('vivid')">ビビッド</button>
+        <button class="preset-btn" onclick="applyPreset('faded')">フェード</button>
+        <button class="preset-btn" onclick="applyPreset('night')">夜撮り</button>
+      </div>
+      <div class="divider"></div>
+
+      <!-- スライダー -->
+      <div class="controls">
+        <div class="control-row">
+          <span class="ctrl-label">彩度</span>
+          <input type="range" id="saturation" min="0" max="200" value="140" oninput="updateSlider(this);processImage()">
+          <span class="ctrl-value" id="saturation-val">140</span>
+        </div>
+        <div class="control-row">
+          <span class="ctrl-label">コントラスト</span>
+          <input type="range" id="contrast" min="0" max="200" value="130" oninput="updateSlider(this);processImage()">
+          <span class="ctrl-value" id="contrast-val">130</span>
+        </div>
+        <div class="control-row">
+          <span class="ctrl-label">明度</span>
+          <input type="range" id="brightness" min="80" max="140" value="108" oninput="updateSlider(this);processImage()">
+          <span class="ctrl-value" id="brightness-val">108</span>
+        </div>
+        <div class="control-row">
+          <span class="ctrl-label">粒子</span>
+          <input type="range" id="grain" min="0" max="80" value="28" oninput="updateSlider(this);processImage()">
+          <span class="ctrl-value" id="grain-val">28</span>
+        </div>
+        <div class="control-row">
+          <span class="ctrl-label">周辺光量</span>
+          <input type="range" id="vignette" min="0" max="100" value="60" oninput="updateSlider(this);processImage()">
+          <span class="ctrl-value" id="vignette-val">60</span>
+        </div>
+        <div class="control-row">
+          <span class="ctrl-label">色温度</span>
+          <input type="range" id="warmth" min="-50" max="50" value="12" oninput="updateSlider(this);processImage()">
+          <span class="ctrl-value" id="warmth-val">12</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右パネル：出力 -->
+  <div>
+    <div class="panel">
+      <div class="panel-label">
+        <span class="dot"></span> DEVELOPED
+        <div style="flex:1"></div>
+        <div class="photo-counter">
+          <small>frame</small>
+          <span id="frame-no">--</span>
+        </div>
+      </div>
+      <div class="canvas-wrap">
+        <div class="processing" id="processing">DEVELOPING...</div>
+        <canvas id="output-canvas" style="display:none;"></canvas>
+        <div class="canvas-placeholder" id="canvas-placeholder">
+          <span class="big">🎞</span>
+          写真をロードしてください
+        </div>
+      </div>
+      <div class="dl-area">
+        <button id="dl-btn" onclick="downloadImage()">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M8 1v9M4 7l4 4 4-4M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/>
+          </svg>
+          SAVE PHOTO
+        </button>
+      </div>
+    </div>
+
+    <!-- フィルム情報 -->
+    <div style="margin-top: 16px; padding: 14px 0;">
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: #333;">
+        <div style="background: var(--paper-dark); padding: 12px 14px;">
+          <div style="font-family:'Bebas Neue'; font-size:0.65rem; letter-spacing:0.2em; color:var(--sepia); margin-bottom:4px;">ISO</div>
+          <div style="font-family:'Bebas Neue'; font-size:1.4rem; color:var(--ink);">400</div>
+        </div>
+        <div style="background: var(--paper-dark); padding: 12px 14px;">
+          <div style="font-family:'Bebas Neue'; font-size:0.65rem; letter-spacing:0.2em; color:var(--sepia); margin-bottom:4px;">LENS</div>
+          <div style="font-family:'Bebas Neue'; font-size:1.4rem; color:var(--ink);">f/10</div>
+        </div>
+        <div style="background: var(--paper-dark); padding: 12px 14px;">
+          <div style="font-family:'Bebas Neue'; font-size:0.65rem; letter-spacing:0.2em; color:var(--sepia); margin-bottom:4px;">FLASH</div>
+          <div style="font-family:'Bebas Neue'; font-size:1.4rem; color:var(--ink);">AUTO</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Film strip footer -->
+<div class="film-strip">
+  <div class="film-holes" id="holes-bottom"></div>
+</div>
+<footer>© 写ルン Lab. — Fuji-Style Film Simulator — For Personal Use</footer>
+
+<script>
+// ── フィルムホールを生成 ──
+function buildHoles(id) {
+  const el = document.getElementById(id);
+  const count = Math.ceil(window.innerWidth / 32) + 4;
+  el.innerHTML = Array(count).fill('<div class="hole"></div>').join('');
+}
+['holes-top','holes-mid','holes-bottom'].forEach(buildHoles);
+
+// ── 状態 ──
+let originalImageData = null;
+let frameCount = 0;
+
+// ── スライダーのグラデーション更新 ──
+function updateSlider(input) {
+  const min = +input.min, max = +input.max, val = +input.value;
+  const pct = ((val - min) / (max - min) * 100).toFixed(1);
+  input.style.setProperty('--pct', pct + '%');
+  document.getElementById(input.id + '-val').textContent = val;
+}
+document.querySelectorAll('input[type="range"]').forEach(updateSlider);
+
+// ── ファイル読み込み ──
+const fileInput = document.getElementById('file-input');
+const uploadArea = document.getElementById('upload-area');
+
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadArea.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) loadImage(file);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) loadImage(e.target.files[0]);
+});
+
+function loadImage(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      // オリジナルプレビュー
+      const preview = document.getElementById('original-preview');
+      preview.src = e.target.result;
+      preview.style.display = 'block';
+      uploadArea.querySelector('.upload-icon').style.display = 'none';
+      uploadArea.querySelector('.upload-text').style.display = 'none';
+
+      // Canvas に描画してピクセルデータ保持
+      const tmpCanvas = document.createElement('canvas');
+      const maxW = 1200, maxH = 1200;
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = h * maxW / w; w = maxW; }
+      if (h > maxH) { w = w * maxH / h; h = maxH; }
+      tmpCanvas.width = w; tmpCanvas.height = h;
+      const ctx = tmpCanvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      originalImageData = ctx.getImageData(0, 0, w, h);
+
+      frameCount++;
+      document.getElementById('frame-no').textContent = String(frameCount).padStart(2,'0');
+      processImage();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── メインフィルター処理 ──
+function processImage() {
+  if (!originalImageData) return;
+
+  const processing = document.getElementById('processing');
+  processing.classList.add('show');
+
+  setTimeout(() => {
+    const saturation  = +document.getElementById('saturation').value / 100;
+    const contrast    = +document.getElementById('contrast').value / 100;
+    const brightness  = +document.getElementById('brightness').value / 100;
+    const grainAmount = +document.getElementById('grain').value;
+    const vignette    = +document.getElementById('vignette').value / 100;
+    const warmth      = +document.getElementById('warmth').value;
+
+    const canvas = document.getElementById('output-canvas');
+    canvas.width  = originalImageData.width;
+    canvas.height = originalImageData.height;
+    const ctx = canvas.getContext('2d');
+
+    // ピクセルコピー
+    const src = originalImageData.data;
+    const imageData = ctx.createImageData(canvas.width, canvas.height);
+    const dst = imageData.data;
+    const W = canvas.width, H = canvas.height;
+    const cx = W / 2, cy = H / 2;
+    const maxDist = Math.sqrt(cx * cx + cy * cy);
+
+    for (let i = 0; i < src.length; i += 4) {
+      let r = src[i], g = src[i+1], b = src[i+2];
+
+      // 1. 明度（brightness）
+      r = r * brightness;
+      g = g * brightness;
+      b = b * brightness;
+
+      // 2. コントラスト
+      r = ((r/255 - 0.5) * contrast + 0.5) * 255;
+      g = ((g/255 - 0.5) * contrast + 0.5) * 255;
+      b = ((b/255 - 0.5) * contrast + 0.5) * 255;
+
+      // 3. 色温度（暖色 +R -B / 寒色 +B -R）
+      r += warmth * 1.2;
+      g += warmth * 0.3;
+      b -= warmth * 1.0;
+
+      // 4. 彩度
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      r = lum + (r - lum) * saturation;
+      g = lum + (g - lum) * saturation;
+      b = lum + (b - lum) * saturation;
+
+      // 5. フィルムグレイン
+      const noise = (Math.random() - 0.5) * grainAmount * 2;
+      r += noise;
+      g += noise * 0.95;
+      b += noise * 0.9;
+
+      // 6. ビネット（周辺光量落とし）
+      const px = (i / 4) % W;
+      const py = Math.floor((i / 4) / W);
+      const dx = (px - cx) / cx;
+      const dy = (py - cy) / cy;
+      const dist = Math.sqrt(dx * dx + dy * dy); // 0 〜 √2
+      const vig = Math.max(0, 1 - (dist * dist * vignette * 1.2));
+      r *= vig; g *= vig; b *= vig;
+
+      // クランプ
+      dst[i]   = Math.max(0, Math.min(255, r));
+      dst[i+1] = Math.max(0, Math.min(255, g));
+      dst[i+2] = Math.max(0, Math.min(255, b));
+      dst[i+3] = src[i+3];
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+
+    // 表示切り替え
+    canvas.style.display = 'block';
+    document.getElementById('canvas-placeholder').style.display = 'none';
+    document.getElementById('dl-btn').classList.add('active');
+    processing.classList.remove('show');
+  }, 30);
+}
+
+// ── プリセット ──
+const presets = {
+  standard: { saturation:140, contrast:130, brightness:108, grain:28, vignette:60, warmth:12 },
+  vivid:    { saturation:185, contrast:155, brightness:112, grain:18, vignette:55, warmth:20 },
+  faded:    { saturation:85,  contrast:95,  brightness:115, grain:35, vignette:40, warmth:-8 },
+  night:    { saturation:120, contrast:160, brightness:88,  grain:55, vignette:85, warmth:-15 },
+};
+
+function applyPreset(name) {
+  const p = presets[name];
+  Object.entries(p).forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    el.value = val;
+    updateSlider(el);
+  });
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('onclick').includes(name));
+  });
+  processImage();
+}
+
+// ── ダウンロード ──
+function downloadImage() {
+  const canvas = document.getElementById('output-canvas');
+  const link = document.createElement('a');
+  link.download = 'utsurundesu_' + Date.now() + '.jpg';
+  link.href = canvas.toDataURL('image/jpeg', 0.92);
+  link.click();
+}
+</script>
+</body>
+</html>
