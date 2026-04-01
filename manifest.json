@@ -1,6 +1,6 @@
 {
-  "name": "写ルン Lab.",
-  "short_name": "写ルンLab",
+  "name": "レトロカメラフィルター",
+  "short_name": "レトロカメラ",
   "description": "使い捨てカメラ風フィルターで写真を現像するWebアプリ",
   "start_url": "/camera-lab/",
   "display": "standalone",
